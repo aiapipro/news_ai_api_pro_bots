@@ -4,28 +4,30 @@
         "check_title":false,
         "check_link_content":true,
         "username":"openaicom_blog",
-        "max_items":3
+        "max_items":30
     },
     {
       "url":"https://hnrss.org/newest",
       "check_title":true,
       "check_link_content":true,
-      "username":"hackernews_newest",
-      "max_items":40
+      "title_not_regex":".+HN:.+",
+      "username":"random",
+      "max_items":30
   },
   {
     "url":"https://towardsdatascience.com/feed",
     "check_title":false,
     "check_link_content":false,
+    "use_reader":true,
     "username":"towardsdatascience",
-    "max_items":4
+    "max_items":60
     },
   {
     "url":"http://feeds.feedburner.com/blogspot/gJZg",
     "check_title":false,
     "check_link_content":true,
     "username":"google_research",
-    "max_items":4
+    "max_items":40
     }  ,
 
     
@@ -34,49 +36,49 @@
     "check_title":false,
     "check_link_content":false,
     "username":"mlmastery",
-    "max_items":3
+    "max_items":30
     },
     {
     "url":"http://distill.pub/rss.xml",
     "check_title":false,
     "check_link_content":false,
     "username":"distill",
-    "max_items":3
+    "max_items":30
     },
     {
     "url":"https://bair.berkeley.edu/blog/feed",
     "check_title":false,
     "check_link_content":false,
     "username":"berkeley_bair",
-    "max_items":3
+    "max_items":30
     },
   {
     "url":"http://karpathy.github.io/feed.xml",
     "check_title":true,
     "check_link_content":true,
     "username":"andrej_karpathy_blog",
-    "max_items":3
+    "max_items":30
     },
     {
       "url":"http://fastml.com/atom.xml",
       "check_title":true,
       "check_link_content":true,
       "username":"fastml_blog",
-      "max_items":2
+      "max_items":20
       } ,
     {
       "url":"https://aws.amazon.com/blogs/machine-learning/feed/",
       "check_title":false,
       "check_link_content":true,
       "username":"aws_ml_blog",
-      "max_items":3
+      "max_items":30
       },
         {
       "url":"http://ai.googleblog.com/feeds/posts/default?alt=rss",
       "check_title":true,
       "check_link_content":true,
       "username":"google_ai_blog",
-      "max_items":4
+      "max_items":40
       },
   
       {
@@ -84,33 +86,33 @@
       "check_title":true,
       "check_link_content":true,
       "username":"analytics_vidhya",
-      "max_items":4
+      "max_items":40
       },{
       "url":"http://news.mit.edu/rss/topic/artificial-intelligence2",
       "check_title":true,
       "check_link_content":true,
       "username":"MIT",
-      "max_items":4
+      "max_items":40
       },
       {
       "url":"https://www.marktechpost.com/feed/",
       "check_title":true,
       "check_link_content":true,
       "username":"marktechpost",
-      "max_items":4
+      "max_items":40
       },  
       {
         "url":"https://deepmind.com/blog/feed/basic/",
         "check_title":true,
         "check_link_content":false,
         "username":"deepmind_blog",
-        "max_items":4
+        "max_items":40
         },   {
         "url":"https://qudata.com/en/news/rss.xml",
         "check_title":true,
         "check_link_content":false,
         "username":"qudata",
-        "max_items":4
+        "max_items":40
         },
 
          {
@@ -118,20 +120,23 @@
         "check_title":true,
         "check_link_content":false,
         "username":"apple_ml",
-        "max_items":4
+        "max_items":40
         },
         {
-        "url":"https://www.oreilly.com/radar/topics/ai-ml/feed/index.xml",
-        "check_title":true,
-        "check_link_content":false,
-        "username":"oreill_aiasoj1n33o2jndsfa",
-        "max_items":4
-        },  
-         {
-        "url":"https://blogs.rstudio.com/ai/index.xml",
-        "check_title":true,
-        "check_link_content":false,
-        "username":"rstudio_blog",
-        "max_items":4
-        }  
+       "url":"https://blogs.rstudio.com/ai/index.xml",
+       "check_title":true,
+       "check_link_content":false,
+       "username":"rstudio_blog",
+       "max_items":40
+       }  ,
+       {
+      "url":"https://us-east1-ml-feeds.cloudfunctions.net/pwc/trending",
+      "check_title":false,
+      "title_regex_remove":"^/.+?/ ",
+      "check_link_content":false,
+      "username":"paperswithcode",
+      "max_items":30
+      }  
+        
+
 ]

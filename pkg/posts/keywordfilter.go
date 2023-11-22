@@ -37,10 +37,10 @@ func init() {
 
 }
 
-func FilterPostsByAIKeywordsInTitle(posts Posts) Posts {
-	filteredPosts := make(Posts, 0, len(posts))
+func FilterPostsByAIKeywordsInTitle(rssPosts Posts) Posts {
+	filteredPosts := make(Posts, 0, len(rssPosts))
 
-	for _, p := range posts {
+	for _, p := range rssPosts {
 		for _, keyword := range aiKeywords {
 			if strings.Contains(strings.ToLower(p.Title), strings.ToLower(keyword)) {
 				filteredPosts = append(filteredPosts, p)
@@ -48,20 +48,35 @@ func FilterPostsByAIKeywordsInTitle(posts Posts) Posts {
 			}
 		}
 	}
+
+	log.Printf("Filtered out %d in 'FilterPostsByAIKeywordsInTitle'", len(rssPosts)-len(filteredPosts))
+
+	return filteredPosts
+}
+
+func FilterPostsByTitleRegex(rssPosts Posts, reg *regexp.Regexp, match bool) Posts {
+	filteredPosts := make(Posts, 0, len(rssPosts))
+
+	for _, p := range rssPosts {
+		regMatched := reg.MatchString(p.Title)
+		if (match && !regMatched) || (!match && regMatched) {
+			// Regex not matched
+			continue
+		}
+		filteredPosts = append(filteredPosts, p)
+	}
+
+	log.Printf("Filtered out %d in 'FilterPostsByTitleRegex'", len(rssPosts)-len(filteredPosts))
+
 	return filteredPosts
 }
 
 var urlRegex = regexp.MustCompile(`https?:\/\/.*?\s`)
 
-func FilterPostsByAIContent(db *badger.DB, posts Posts) (Posts, error) {
-	filteredPosts := make(Posts, 0, len(posts))
-
-	txn := db.NewTransaction(true)
-	defer txn.Discard()
+func EnrichPostsWithExcerpt(posts Posts) (Posts, error) {
+	enrichedPosts := make(Posts, 0, len(posts))
 
 	for _, p := range posts {
-		key := "post+" + p.Url
-
 		resp, err := http.Get(p.Url)
 		if err != nil {
 			log.Println(fmt.Errorf("could not http get url %q: %w", p.Url, err))
@@ -80,25 +95,44 @@ func FilterPostsByAIContent(db *badger.DB, posts Posts) (Posts, error) {
 			continue
 		}
 
-		// Check again if we find keyword in body. Try to reduce GPT cost
-		keywordFound := false
-		for _, keyword := range aiKeywords {
-			if strings.Contains(strings.ToLower(plain), strings.ToLower(keyword)) {
-				keywordFound = true
-				break
-			}
-		}
-
-		if !keywordFound {
-			continue
-		}
-
 		excerpt := plain
 		if words := strings.Split(excerpt, " "); len(words) > 350 {
 			excerpt = strings.Join(words[:350], " ")
 		}
+		p.Excerpt = excerpt
 
-		articleIsAboutAI, err := promptBetterCheckArticle(excerpt)
+		enrichedPosts = append(enrichedPosts, p)
+	}
+
+	return enrichedPosts, nil
+
+}
+func FilterPostsByAIContent(db *badger.DB, posts Posts) (Posts, error) {
+	filteredPosts := make(Posts, 0, len(posts))
+
+	txn := db.NewTransaction(true)
+	defer txn.Discard()
+
+	for _, p := range posts {
+		key := "post+" + p.Url
+
+		// Check again if we find keyword in body. Try to reduce GPT cost
+		keywordFound := false
+		for _, keyword := range aiKeywords {
+			if strings.Contains(strings.ToLower(p.Excerpt), strings.ToLower(keyword)) {
+				keywordFound = true
+				break
+			}
+		}
+		if !keywordFound {
+			continue
+		}
+
+		if p.Excerpt == "" {
+			continue
+		}
+
+		articleIsAboutAI, err := promptBetterCheckArticle(p.Excerpt)
 		if err != nil {
 			return nil, fmt.Errorf("could not promptBetterCheckArticle: %w", err)
 		}
@@ -119,6 +153,7 @@ func FilterPostsByAIContent(db *badger.DB, posts Posts) (Posts, error) {
 	if err := txn.Commit(); err != nil {
 		log.Println(fmt.Errorf("could not commit to db: %w", err))
 	}
+	log.Printf("Filtered out %d in 'FilterPostsByAIContent'", len(posts)-len(filteredPosts))
 
 	return filteredPosts, nil
 }
@@ -184,13 +219,58 @@ func promptBetterCheckArticle(articleExcerpt string) (bool, error) {
 
 }
 
-type pbRephraseTitlePayload struct {
+type pbSummarizeArticlePayload struct {
 	Title string `json:"title"`
+	Post  string `json:"post"`
 }
 
-func promptBetterRephraseTitle(title string) (string, error) {
+func PromptBetterSummarizeArticle(title, excerpt string) (string, error) {
+	payloadBytes, err := json.Marshal(pbSummarizeArticlePayload{
+		Title: title,
+		Post:  excerpt,
+	})
+	if err != nil {
+		return "", fmt.Errorf("could not marshal input body: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", "https://api.promptbetter.ai/v1/2qcutndk/run/write-summary-of-website", bytes.NewReader(payloadBytes))
+	if err != nil {
+		return "", fmt.Errorf("could not create request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+promptBetterToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("could not create request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("could not read resp body: %w", err)
+	}
+
+	rData := pbResponse{}
+	err = json.Unmarshal(respBody, &rData)
+	if err != nil {
+		return "", fmt.Errorf("could not unmarshal resp body: %w", err)
+	}
+
+	return rData.Data, nil
+
+}
+
+type pbRephraseTitlePayload struct {
+	Title string `json:"title"`
+	Excerpt string `json:"excerpt"`
+}
+
+func PromptBetterRephraseTitle(title, excerpt string) (string, error) {
 	payloadBytes, err := json.Marshal(pbRephraseTitlePayload{
 		Title: title,
+		Excerpt: excerpt,
 	})
 	if err != nil {
 		return "", fmt.Errorf("could not marshal input body: %w", err)
@@ -222,25 +302,4 @@ func promptBetterRephraseTitle(title string) (string, error) {
 	}
 
 	return rData.Data, nil
-}
-
-func FilterAlreadyPosted(db *badger.DB, posts Posts) (Posts, error) {
-
-	notPosted := make(Posts, 0, len(posts))
-	for _, p := range posts {
-		key := "post+" + p.Url
-
-		txn := db.NewTransaction(true)
-		defer txn.Discard()
-		_, err := txn.Get([]byte(key))
-		if err == nil {
-			// Key found, filter out
-			continue
-		}
-
-		notPosted = append(notPosted, p)
-	}
-
-	return notPosted, nil
-
 }

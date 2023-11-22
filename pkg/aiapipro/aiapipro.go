@@ -6,10 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"newsbots/pkg/posts"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -25,7 +28,6 @@ func init() {
 }
 
 func GetRandomAuthenticateUserToken(db *badger.DB) (token string, err error) {
-
 	// Get a random username
 	randomUsername := strings.ToLower(usernames[rand.Intn(len(usernames))])
 
@@ -35,17 +37,12 @@ func GetRandomAuthenticateUserToken(db *badger.DB) (token string, err error) {
 	_, err = txn.Get([]byte(randomUsername))
 	if err == nil {
 		// Key found, return it
+		log.Print("Key found, user exists. Login")
 		return LoginUser(randomUsername)
 	}
 	if !errors.Is(err, badger.ErrKeyNotFound) {
 		return "", fmt.Errorf("could not get from db: %w", err)
 	}
-	// Key not found, create new user
-	jwt, err := createNewUser(randomUsername)
-	if err != nil {
-		return "", fmt.Errorf("could not createNewUser: %w", err)
-	}
-	token = jwt
 	err = txn.Set([]byte(randomUsername), []byte(token))
 	if err != nil {
 		return "", fmt.Errorf("could not set to db: %w", err)
@@ -56,6 +53,12 @@ func GetRandomAuthenticateUserToken(db *badger.DB) (token string, err error) {
 		return "", fmt.Errorf("could not commit to db: %w", err)
 	}
 
+	// Key not found, create new user
+	jwt, err := createNewUser(randomUsername)
+	if err != nil {
+		return LoginUser(randomUsername)
+	}
+	token = jwt
 	return token, nil
 
 }
@@ -72,21 +75,22 @@ func GetAuthenticateUserToken(db *badger.DB, username string) (token string, err
 	if !errors.Is(err, badger.ErrKeyNotFound) {
 		return "", fmt.Errorf("could not get from db: %w", err)
 	}
+
+	err = txn.Set([]byte(username), []byte(token))
+	if err != nil {
+		return "", fmt.Errorf("could not set to db: %w", err)
+	}
+	// Commit the transaction and check for error.
+	if err := txn.Commit(); err != nil {
+		return "", fmt.Errorf("could not commit to db: %w", err)
+	}
+
 	// Key not found, create new user
 	jwt, err := createNewUser(username)
 	if err != nil {
 		return "", fmt.Errorf("could not createNewUser: %w", err)
 	}
 	token = jwt
-	err = txn.Set([]byte(username), []byte(token))
-	if err != nil {
-		return "", fmt.Errorf("could not set to db: %w", err)
-	}
-
-	// Commit the transaction and check for error.
-	if err := txn.Commit(); err != nil {
-		return "", fmt.Errorf("could not commit to db: %w", err)
-	}
 
 	return token, nil
 
@@ -130,16 +134,44 @@ type Post struct {
 }
 
 func GetPosts() ([]Post, error) {
-	resp := getPostsResponse{}
-	err := posts.GetJSON("https://news.aiapipro.com/api/v3/post/list", &resp)
-	if err != nil {
-		return nil, fmt.Errorf("could not GetJSON: %w", err)
+	respPosts := make([]Post, 0)
+
+	for page := 1; ; page++ {
+		resp := getPostsResponse{}
+		err := posts.GetJSON(fmt.Sprintf("https://news.aiapipro.com/api/v3/post/list?limit=50&page=%d", page), &resp)
+		if err != nil {
+			return nil, fmt.Errorf("could not GetJSON: %w", err)
+		}
+		if len(resp.Posts) == 0 {
+			break
+		}
+		for _, p := range resp.Posts {
+			newPost := p.Post
+			newPost.URL = strings.TrimPrefix(newPost.URL, "https://reader.aiapipro.com/?url=")
+			respPosts = append(respPosts, newPost)
+		}
 	}
-	respPosts := make([]Post, len(resp.Posts))
-	for k, p := range resp.Posts {
-		respPosts[k] = p.Post
-	}
+
+	sort.Slice(respPosts, func(i, j int) bool {
+		return respPosts[i].ID < respPosts[j].ID
+	})
+
 	return respPosts, nil
+}
+
+type deletePostsResponsRequest struct {
+	PostID  int    `json:"post_id"`
+	Removed bool   `json:"removed"`
+	Auth    string `json:"auth"`
+}
+
+func DeletePost(jwt string, postID int) error {
+	req := deletePostsResponsRequest{
+		PostID:  postID,
+		Removed: true,
+		Auth:    jwt,
+	}
+	return posts.PostJSON("https://news.aiapipro.com/api/v3/post/remove", &req, nil)
 }
 
 type upvotePostRequest struct {
@@ -235,6 +267,9 @@ func LoginUser(username string) (jwt string, err error) {
 	if err != nil {
 		return "", fmt.Errorf("could not read response body: %w", err)
 	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Did not get status 200, but %d. Body: %s", resp.StatusCode, string(bodyText))
+	}
 
 	newUserResp := createNewUserResponse{}
 	err = json.Unmarshal(bodyText, &newUserResp)
@@ -249,6 +284,7 @@ type newPostRequest struct {
 	URL         string `json:"url"`
 	Auth        string `json:"auth"`
 	CommunityID int    `json:"community_id"`
+	Body        string `json:"body,omitempty"`
 }
 
 func NewPost(db *badger.DB, post posts.Post, jwt string) (err error) {
@@ -257,7 +293,12 @@ func NewPost(db *badger.DB, post posts.Post, jwt string) (err error) {
 		URL:         post.Url,
 		Auth:        jwt,
 		CommunityID: 4,
+		Body:        post.Description,
 	}
+	if strings.Contains(post.Url, "paperswithcode.com") || strings.Contains(post.Url, "arxiv.org") {
+		newPost.CommunityID = 7 // Set to papers community
+	}
+
 	newPostJSON, err := json.Marshal(newPost)
 	if err != nil {
 		return fmt.Errorf("could not marshal request body: %w", err)
@@ -292,5 +333,70 @@ func NewPost(db *badger.DB, post posts.Post, jwt string) (err error) {
 		return fmt.Errorf("could not commit to db: %w", err)
 	}
 
+	fmt.Println("POSTED", post.Title)
+
 	return nil
+}
+
+func FilterAlreadyPosted(db *badger.DB, rssPosts posts.Posts) (posts.Posts, error) {
+	allCurrentUrls := make(map[string]bool, 0)
+	notPosted := make(posts.Posts, 0, len(rssPosts))
+	for _, p := range rssPosts {
+		key := "post+" + p.Url
+
+		if _, posted := allCurrentUrls[p.Url]; posted {
+			// Found in current page. Filter out
+			continue
+		}
+
+		txn := db.NewTransaction(true)
+		defer txn.Discard()
+		_, err := txn.Get([]byte(key))
+		if err == nil {
+			// Key found, filter out
+			continue
+		}
+
+		notPosted = append(notPosted, p)
+	}
+
+	log.Printf("Filtered out %d in 'FilterAlreadyPosted'", len(rssPosts)-len(notPosted))
+
+	return notPosted, nil
+
+}
+
+func FilterTooMuchPosted(db *badger.DB, max int, rssPosts posts.Posts, allCurrentPosts []Post) (posts.Posts, error) {
+	todayDate := time.Now().Format("2006-01-02")
+
+	notPosted := make(posts.Posts, 0, len(rssPosts))
+
+	for _, p := range rssPosts {
+		postUrl, err := url.Parse(p.Url)
+		if err != nil {
+			log.Print("could not parse url:", p.Url, err)
+			continue
+		}
+
+		alreadyPosts := 0
+		for _, cP := range allCurrentPosts {
+			if !strings.Contains(cP.Published, todayDate) {
+				// Not today
+				continue
+			}
+			if strings.Contains(cP.URL, postUrl.Host) {
+				alreadyPosts++
+			}
+		}
+		if alreadyPosts >= max {
+			continue
+		}
+
+		notPosted = append(notPosted, p)
+	}
+
+	log.Printf("Filtered out %d in 'FilterTooMuchPosted'", len(rssPosts)-len(notPosted))
+
+	return notPosted, nil
+
 }
