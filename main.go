@@ -129,6 +129,9 @@ func main() {
 		})
 		newsUrls := make([]NewsURL, len(allCurrentPosts))
 		for k, p := range allCurrentPosts {
+			if k > 30000 {
+				break
+			}
 			publishedDate, err := time.Parse("2006-01-02T15:04:05.999999", p.Published)
 			if err != nil {
 				log.Println("could not parse published date", p.Published, err)
