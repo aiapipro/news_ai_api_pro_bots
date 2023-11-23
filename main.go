@@ -115,7 +115,11 @@ func main() {
 	// Exec argument
 	switch os.Args[1] {
 	case "sitemap":
-		newsSitemap, err := os.Create("sitemap.xml")
+		sitemapPath := "sitemap.xml"
+		if len(os.Args) > 2 {
+			sitemapPath = os.Args[2]
+		}
+		newsSitemap, err := os.Create(sitemapPath)
 		if err != nil {
 			log.Fatal("Could not create sitemap.xml", err)
 		}
