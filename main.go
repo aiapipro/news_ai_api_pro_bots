@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"log"
 	"math/rand"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -38,6 +40,36 @@ type RSSFeedConfig struct {
 type ModerareRules struct {
 	ForbiddenTitleRegex []string `json:"forbidden_title_regex"`
 	ForbiddenUrlRegex   []string `json:"forbidden_url_regex"`
+}
+
+// Sitemap represents the structure of the sitemap
+type NewsSitemap struct {
+	XMLName xml.Name  `xml:"urlset"`
+	XMLNS   string    `xml:"xmlns,attr"`
+	NewsNS  string    `xml:"xmlns:news,attr"`
+	URLs    []NewsURL `xml:"url"`
+}
+
+// NewsURL represents the structure of a news URL in the sitemap
+type NewsURL struct {
+	Loc     string   `xml:"loc"`
+	LastMod string   `xml:"lastmod"`
+	News    NewsInfo `xml:"news:news"`
+}
+
+// NewsInfo represents the news information in the sitemap
+type NewsInfo struct {
+	XMLName         xml.Name `xml:"news:news"`
+	Publication     PublicationInfo
+	PublicationDate string `xml:"news:publication_date"`
+	Title           string `xml:"news:title"`
+}
+
+// PublicationInfo represents the publication information in the sitemap
+type PublicationInfo struct {
+	XMLName  xml.Name `xml:"news:publication"`
+	Name     string   `xml:"news:name"`
+	Language string   `xml:"news:language"`
 }
 
 func main() {
@@ -82,6 +114,63 @@ func main() {
 
 	// Exec argument
 	switch os.Args[1] {
+	case "sitemap":
+		newsSitemap, err := os.Create("sitemap.xml")
+		if err != nil {
+			log.Fatal("Could not create sitemap.xml", err)
+		}
+
+		sort.Slice(allCurrentPosts, func(i, j int) bool {
+			return allCurrentPosts[i].ID > allCurrentPosts[j].ID
+		})
+		newsUrls := make([]NewsURL, len(allCurrentPosts))
+		for k, p := range allCurrentPosts {
+			publishedDate, err := time.Parse("2006-01-02T15:04:05.999999", p.Published)
+			if err != nil {
+				log.Println("could not parse published date", p.Published, err)
+				continue
+			}
+			if p.Counts.NewestCommentTime == "" {
+				p.Counts.NewestCommentTime = p.Published
+			}
+			lastCommentDate, err := time.Parse("2006-01-02T15:04:05.999999", p.Counts.NewestCommentTime)
+			if err != nil {
+				log.Println("could not parse NewestCommentTime date", p.Published, err)
+				continue
+			}
+			newsUrls[k] = NewsURL{
+				Loc:     p.ApID,
+				LastMod: lastCommentDate.Format("2006-01-02"),
+				News: NewsInfo{
+					Publication: PublicationInfo{
+						Name:     "AI News (AI API Pro)",
+						Language: "en",
+					},
+					PublicationDate: publishedDate.Format("2006-01-02"),
+					Title:           p.Name,
+				},
+			}
+		}
+
+		// Create a sample Sitemap with multiple URLs
+		sitemap := NewsSitemap{
+			XMLNS:  "http://www.sitemaps.org/schemas/sitemap/0.9",
+			NewsNS: "http://www.google.com/schemas/sitemap-news/0.9",
+			URLs:   newsUrls,
+		}
+
+		// Marshal the struct into XML
+		xmlData, err := xml.MarshalIndent(sitemap, "", "  ")
+		if err != nil {
+			log.Fatal("Could not marshal XML:", err)
+		}
+
+		// Print the XML
+		_, err = newsSitemap.WriteString(xml.Header + string(xmlData))
+		if err != nil {
+			log.Fatal("Could not write to sitemap.xml", err)
+		}
+
 	case "rss":
 		feedConfigsJSON, err := os.ReadFile(path.Join(binaryPath, "rss_feeds.json"))
 		if err != nil {

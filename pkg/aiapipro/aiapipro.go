@@ -108,10 +108,28 @@ type createNewUserRequest struct {
 
 type getPostsResponse struct {
 	Posts []struct {
-		Post Post `json:"post"`
+		Post   Post   `json:"post"`
+		Counts Counts `json:"counts"`
 	} `json:"posts"`
 }
 
+type Counts struct {
+	Id                     int    `json:"id"`
+	PostId                 int    `json:"post_id"`
+	Comments               int    `json:"comments"`
+	Score                  int    `json:"score"`
+	Upvotes                int    `json:"upvotes"`
+	Downvotes              int    `json:"downvotes"`
+	Published              string `json:"published"`
+	NewestCommentTimeNecro string `json:"newest_comment_time_necro"`
+	NewestCommentTime      string `json:"newest_comment_time"`
+	FeaturedCommunity      bool   `json:"featured_community"`
+	FeaturedLocal          bool   `json:"featured_local"`
+	HotRank                int    `json:"hot_rank"`
+	HotRankActive          int    `json:"hot_rank_active"`
+	CommunityId            int    `json:"community_id"`
+	CreatorId              int    `json:"creator_id"`
+}
 type Post struct {
 	ID                int    `json:"id"`
 	Name              string `json:"name"`
@@ -131,6 +149,7 @@ type Post struct {
 	LanguageID        int    `json:"language_id"`
 	FeaturedCommunity bool   `json:"featured_community"`
 	FeaturedLocal     bool   `json:"featured_local"`
+	Counts            Counts `json:"-"`
 }
 
 func GetPosts() ([]Post, error) {
@@ -147,6 +166,7 @@ func GetPosts() ([]Post, error) {
 		}
 		for _, p := range resp.Posts {
 			newPost := p.Post
+			newPost.Counts = p.Counts
 			newPost.URL = strings.TrimPrefix(newPost.URL, "https://reader.aiapipro.com/?url=")
 			respPosts = append(respPosts, newPost)
 		}
