@@ -31,7 +31,7 @@ type RSSFeedConfig struct {
 	CheckLinkContent bool    `json:"check_link_content"`
 	Username         string  `json:"username"`
 	MaxItems         *int    `json:"max_items,omitempty"`
-	Spread         *int    `json:"spread,omitempty"`
+	Spread           *int    `json:"spread,omitempty"`
 	UseReader        bool    `json:"use_reader"`
 }
 
@@ -95,10 +95,10 @@ func main() {
 
 		allRssPosts := make(posts.Posts, 0)
 		for _, feedConfig := range feedConfigs {
-			if feedConfig.Spread != nil{
+			if feedConfig.Spread != nil {
 				// Random check if we skip
-				if rand.Intn(100) > *feedConfig.Spread{
-					log.Print("Skip as of spread",feedConfig.URL)
+				if rand.Intn(100) > *feedConfig.Spread {
+					log.Print("Skip as of spread", feedConfig.URL)
 				}
 			}
 			log.Println(feedConfig.URL)
@@ -184,9 +184,9 @@ func main() {
 				}
 			}
 			for _, p := range rssPosts {
-				 if feedConfig.UseReader {
-				 	p.Url = fmt.Sprintf("https://reader.aiapipro.com/?url=%s", p.Url)
-				 }
+				if feedConfig.UseReader {
+					p.Url = fmt.Sprintf("https://reader.aiapipro.com/?url=%s", p.Url)
+				}
 				p.JWT = jwt
 
 				allRssPosts = append(allRssPosts, p)
@@ -198,7 +198,7 @@ func main() {
 		})
 
 		for _, p := range allRssPosts {
-	
+
 			resp, err := http.Get(p.Url)
 			if err != nil {
 				log.Printf("could not get url %q: %s", p.Url, err)
@@ -207,17 +207,16 @@ func main() {
 				continue
 			}
 
-
 			p.Description, err = posts.PromptBetterSummarizeArticle(p.Title, p.Excerpt)
 			if err != nil {
 				log.Println(fmt.Errorf("could not promptBetterSummarizeArticle: %w", err))
 				continue
 			}
-			p.Title, err = posts.PromptBetterRephraseTitle(p.Title,"")
+			p.Title, err = posts.PromptBetterRephraseTitle(p.Title, "")
 			if err != nil {
 				log.Println(fmt.Errorf("could not promptBetterRephraseTitle: %w", err))
 				continue
-}
+			}
 
 			err = aiapipro.NewPost(db, p, p.JWT)
 			if err != nil {
@@ -248,6 +247,11 @@ func main() {
 			// Also check urls
 			delete := false
 			for _, r := range moderateRules.ForbiddenUrlRegex {
+				if len(strings.ReplaceAll(r, " ", "_")) < 4 {
+					log.Println("Skip too short url regex", r)
+					continue
+				}
+
 				if strings.Contains(strings.ToLower(p.URL), strings.ToLower(r)) {
 					log.Println("Delete because of url regex", p.URL)
 
@@ -259,6 +263,10 @@ func main() {
 			if !delete {
 				// Check titles regex
 				for _, r := range moderateRules.ForbiddenTitleRegex {
+					if len(strings.ReplaceAll(r, " ", "_")) < 4 {
+						log.Println("Skip too short title regex", r)
+						continue
+					}
 					if strings.Contains(strings.ToLower(p.Name), strings.ToLower(r)) {
 						delete = true
 						log.Println("Delete because of title regex", p.Name)
@@ -309,7 +317,7 @@ func main() {
 			}
 
 			for k, _ := range allCurrentPosts {
-post := allCurrentPosts[len(allCurrentPosts)-1-k]
+				post := allCurrentPosts[len(allCurrentPosts)-1-k]
 				if k > 30 {
 					break
 				}
