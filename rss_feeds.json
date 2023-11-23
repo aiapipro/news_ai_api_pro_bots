@@ -136,7 +136,75 @@
       "check_link_content":false,
       "username":"paperswithcode",
       "max_items":30
-      }  
-        
-
+      },
+    {
+      "url":"https://www.youtube.com/feeds/videos.xml?channel_id=UCYO_jab_esuFRV4b17AJtAw",
+      "check_title":false,
+      "check_link_content":false,
+      "username":"3Blue1Brown",
+      "max_items":30
+    },
+    {
+      "url":"https://www.youtube.com/feeds/videos.xml?channel_id=UCqd6TofKNjqagInm5Waeu7w",
+      "check_title":false,
+      "check_link_content":false,
+      "username":"Springboard",
+      "max_items":30
+    },
+    {
+      "url":"https://www.youtube.com/feeds/videos.xml?channel_id=UC9OeZkIwhzfv-_Cb7fCikLQ",
+      "check_title":false,
+      "check_link_content":false,
+      "username":"DeepLearningTV",
+      "max_items":30
+    },
+    {
+      "url":"https://www.youtube.com/feeds/videos.xml?channel_id=UCNIkB2IeJ-6AmZv7bQ1oBYg",
+      "check_title":false,
+      "check_link_content":false,
+      "username":"Arxiv Insights",
+      "max_items":30
+    },
+    {
+      "url":"https://www.youtube.com/feeds/videos.xml?channel_id=UCSNeZleDn9c74yQc",
+      "check_title":false,
+      "check_link_content":false,
+      "username":"Kaggle",
+      "max_items":30
+    },
+    {
+      "url":"https://www.youtube.com/feeds/videos.xml?channel_id=UCbfYPyITQ-7l4upoX8nvctg",
+      "check_title":false,
+      "check_link_content":false,
+      "username":"Two Minute Papers",
+      "max_items":30
+    },
+    {
+      "url":"https://www.youtube.com/feeds/videos.xml?channel_id=UC58v9cLitc8VaCjrcKyAbrw",
+      "check_title":false,
+      "check_link_content":false,
+      "username":"MachineLearningwithPhil",
+      "max_items":30
+    },
+    {
+      "url":"https://www.youtube.com/feeds/videos.xml?channel_id=UCfzlCWGWYyIQ0aLC5w48gBQ",
+      "check_title":false,
+      "check_link_content":false,
+      "username":"sentdex",
+      "max_items":30
+    },
+    {
+      "url":"https://www.youtube.com/feeds/videos.xml?channel_id=UCX7Y2qWriXpqocG97SFW2OQ",
+      "check_title":false,
+      "check_link_content":false,
+      "username":"howardjeremyp",
+      "max_items":30
+    },
+    {
+      "url":"https://www.youtube.com/feeds/videos.xml?channel_id=UCcIXc5mJsHVYTZR1maL5l9w",
+      "check_title":false,
+      "check_link_content":false,
+      "username":"Deeplearningai",
+      "max_items":30
+    }
 ]
